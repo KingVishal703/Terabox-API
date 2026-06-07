@@ -10,6 +10,14 @@ from urllib.parse import urlparse, parse_qs
 
 app = Flask(__name__)
 
+# Enable CORS for all routes so the API can be called from a browser frontend
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    return response
+
 # ====== 🇮🇳 ==============
 # # © Developer = WOODcraft 
 # ========================
@@ -22,6 +30,7 @@ PORT = 3000
 # Supported domains
 SUPPORTED_DOMAINS = [
     "terabox.com",
+    "terabox.app",
     "1024terabox.com",
     "teraboxapp.com",
     "teraboxlink.com",
@@ -35,25 +44,31 @@ SUPPORTED_DOMAINS = [
 ]
 
 # Regex pattern for Terabox URLs
-TERABOX_URL_REGEX = r'^https:\/\/(www\.)?(terabox\.com|1024terabox\.com|teraboxapp\.com|teraboxlink\.com|terasharelink\.com|terafileshare\.com|1024tera\.com|1024tera\.cn|teraboxdrive\.com|dubox\.com)\/(s|sharing\/link)\/[A-Za-z0-9_\-]+'
+TERABOX_URL_REGEX = r'^https:\/\/(www\.)?(terabox\.com|terabox\.app|1024terabox\.com|teraboxapp\.com|teraboxlink\.com|terasharelink\.com|terafileshare\.com|1024tera\.com|1024tera\.cn|teraboxdrive\.com|dubox\.com)\/(s\/|sharing\/link)'
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# TESTED COOKIES (Updated 2024-06-23)
-COOKIES = {
-    'ndut_fmt': '082E0D57C65BDC31F6FF293F5D23164958B85D6952CCB6ED5D8A3870CB302BE7',
-    'ndus': 'Y-wWXKyteHuigAhC03Fr4bbee-QguZ4JC6UAdqap',
-    '__bid_n': '196ce76f980a5dfe624207',
-    '__stripe_mid': '148f0bd1-59b1-4d4d-8034-6275095fc06f99e0e6',
-    '__stripe_sid': '7b425795-b445-47da-b9db-5f12ec8c67bf085e26',
-    'browserid': 'veWFJBJ9hgVgY0eI9S7yzv66aE28f3als3qUXadSjEuICKF1WWBh4inG3KAWJsAYMkAFpH2FuNUum87q',
-    'csrfToken': 'wlv_WNcWCjBtbNQDrHSnut2h',
-    'lang': 'en',
-    'PANWEB': '1',
-    'ab_sr': '1.0.1_NjA1ZWE3ODRiYjJiYjZkYjQzYjU4NmZkZGVmOWYxNDg4MjU3ZDZmMTg0Nzg4MWFlNzQzZDMxZWExNmNjYzliMGFlYjIyNWUzYzZiODQ1Nzg3NWM0MzIzNWNiYTlkYTRjZTc0ZTc5ODRkNzg4NDhiMTljOGRiY2I4MzY4ZmYyNTU5ZDE5NDczZmY4NjJhMDgyNjRkZDI2MGY5M2Q5YzIyMg=='
-}
+# Cookies are loaded from the COOKIE_JSON environment variable.
+# Set COOKIE_JSON in your host (e.g. Render) to a JSON object, e.g.:
+#   {"ndus": "YOUR_NDUS_VALUE", "lang": "en"}
+# At minimum the "ndus" cookie is required for downloads to resolve.
+def load_cookies():
+    raw = os.environ.get("COOKIE_JSON", "").strip()
+    if not raw:
+        logger.warning("COOKIE_JSON env var is not set — downloads will fail.")
+        return {}
+    try:
+        data = json.loads(raw)
+        if isinstance(data, dict):
+            return {str(k): str(v) for k, v in data.items()}
+    except json.JSONDecodeError:
+        # Fall back: treat the raw value as the ndus cookie itself
+        return {"ndus": raw}
+    return {}
+
+COOKIES = load_cookies()
 
 # FIXED HEADERS AS REQUESTED
 HEADERS = {
